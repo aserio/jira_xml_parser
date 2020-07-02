@@ -176,7 +176,7 @@ for el in range(len(keys)):
         result = excel_keys.index(keys[el])
         ## Determine if all values should updated vased on "Updated" value
         ### Compare Updated value (Column H)
-        if tickets[el][7] != excel_data[result][2] or args.force_update:   #Need to enumerate headings
+        if tickets[el][7] != excel_data[result][2].strftime("%m/%d/%Y %H:%M:%S") or args.force_update:   #Need to enumerate headings
             updated_tickets += 1
             ## Update ticket with current infromation
             for el2 in range(len(dict_keys)):
