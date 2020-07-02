@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from openpyxl import Workbook, load_workbook
 import os
 import argparse
-from datetime import date
+from datetime import date, datetime
 
 def read_xml(file):
     # Read in xml file
@@ -47,6 +47,8 @@ def find_tag (key, tag):
         tag_tablet = find_triage(key)
     elif tag is 'priority':
         tag_tablet = find_priority(key)
+    elif tag is 'created' or tag is 'updated':
+        tag_tablet = find_date(key, tag)
     else:
         text = "./channel/item/[key='"+key+"']"
         tag_tablet = xml_root.find(text).find(tag).text
@@ -81,6 +83,14 @@ def find_priority(key):
         return prty
     else:
         return "None"
+
+def find_date(key, tag):
+    text = "./channel/item/[key='"+key+"']"
+    xelement = xml_root.find(text).find(tag).text 
+    # Remove the " -0500" from the end of the string
+    xelement = xelement[:-6]
+    date_str = datetime.strptime(xelement,'%a, %d %b %Y %H:%M:%S').strftime("%m/%d/%Y %H:%M:%S")
+    return date_str
 
 def clean_string(str):
     # Remove returns and excess whitespace.
@@ -187,5 +197,19 @@ for cell in ws.iter_rows(min_row=2, min_col=2, max_col=2):
         iname = cell[0].value
         ws[cell[0].coordinate].hyperlink = jira_url_root + iname
         ws[cell[0].coordinate].style = "Hyperlink"
+
+# Add Date format for created column
+for cell in ws.iter_rows(min_row=2, min_col=7, max_col=7):
+    if not cell[0].is_date:
+        date_obj = datetime.strptime(cell[0].value, '%m/%d/%Y %H:%M:%S')
+        ws[cell[0].coordinate].value = date_obj
+        ws[cell[0].coordinate].number_format = 'MMM DD, YYYY'
+
+# Add Date format for updated column
+for cell in ws.iter_rows(min_row=2, min_col=8, max_col=8):
+    if not cell[0].is_date:
+        date_obj = datetime.strptime(cell[0].value, '%m/%d/%Y %H:%M:%S')
+        ws[cell[0].coordinate].value = date_obj
+        ws[cell[0].coordinate].number_format = 'MMM DD, YYYY'
 
 wb.save(excel_file)
