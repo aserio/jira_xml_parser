@@ -7,21 +7,23 @@
 import xml.etree.ElementTree as ET
 from openpyxl import Workbook, load_workbook
 import os
+import sys
 import argparse
 from datetime import date, datetime
 
 def read_xml(file):
     # Read in xml file
     if not os.path.exists(file):
-        sys.exit("No XML file found.")
+        error_msg = "The file " + file + " could not be found!"
+        sys.exit(error_msg)
     root = ET.parse(file).getroot()
     #print(root.tag)
     return root
 
 def read_excel(file):
     # Set up Excel
-    if os.path.exists(excel_file):
-        wb = load_workbook(filename = excel_file)
+    if os.path.exists(file):
+        wb = load_workbook(filename = file)
     else:
        wb = Workbook()
        ws = wb.active
@@ -49,6 +51,10 @@ def find_tag (key, tag):
         tag_tablet = find_priority(key)
     elif tag is 'created' or tag is 'updated':
         tag_tablet = find_date(key, tag)
+    elif tag is 'blocks':
+        tag_tablet = find_blocks(key)
+    elif tag is 'blocked_by':
+        tag_tablet = find_blocked_by(key)
     else:
         text = "./channel/item/[key='"+key+"']"
         tag_tablet = xml_root.find(text).find(tag).text
@@ -92,6 +98,38 @@ def find_date(key, tag):
     date_str = datetime.strptime(xelement,'%a, %d %b %Y %H:%M:%S').strftime("%m/%d/%Y %H:%M:%S")
     return date_str
 
+def find_blocks(key):
+    text = "./channel/item/issuelinks/..[key='"+key+"']/issuelinks/issuelinktype[@id='10000']/outwardlinks[@description='blocks']"
+    blocks_issues = ""
+    cntr = 0
+    if ET.iselement(xml_root.find(text)):
+        xelement = xml_root.find(text)
+        for el in xelement.iter('issuekey'):
+            if cntr is 0:
+                blocks_issues = el.text
+            else:
+                blocks_issues = blocks_issues + ', ' + el.text
+            cntr = cntr + 1
+        return blocks_issues
+    else:
+        return ""
+
+def find_blocked_by(key):
+    text = "./channel/item/issuelinks/..[key='"+key+"']/issuelinks/issuelinktype[@id='10000']/inwardlinks[@description='is blocked by']"
+    blocked_by = ""
+    cntr = 0
+    if ET.iselement(xml_root.find(text)):
+        xelement = xml_root.find(text)
+        for el in xelement.iter('issuekey'):
+            if cntr is 0:
+                blocked_by = el.text
+            else:
+                blocked_by = blocked_by + ', ' + el.text
+            cntr = cntr + 1
+        return blocked_by
+    else:
+        return ""
+
 def clean_string(str):
     # Remove returns and excess whitespace.
     str = str.replace('\n',"").replace("  ", "")
@@ -125,13 +163,15 @@ jira_url_root = 'http://ontrack-internal.amd.com/browse/'
 # List the tags you are interested in collcecting
 dict_keys = ["type", "key" , "summary", "assignee"
                          , "reporter", "status", "created", "updated"
-                         , "priority", "triage", "labels"]
+                         , "priority", "triage", "labels" 
+                         , "blocks", "blocked_by"]
                          #, "Target SW Release"]
 
 # List the heading you would like to use
 headings = ["Issue Type", "Key", "Summary", "Assignee"
                          , "Reporter", "Status", "Created", "Updated"
-                         , "Priority", "Triage Assignment", "Lablels"]
+                         , "Priority", "Triage Assignment", "Lablels"
+                         , "Blocks", "Blocked By"]
                          #, "Target SW Release"]
 
 xml_root = read_xml(xml_file)
@@ -192,6 +232,7 @@ print("Updated Tickets: ", updated_tickets)
 print("New Tickets", new_tickets)
 
 # Add URLs to keys
+#  For the "Key" Column
 for cell in ws.iter_rows(min_row=2, min_col=2, max_col=2):
     if cell[0].style is not "Hyperlink":
         iname = cell[0].value
