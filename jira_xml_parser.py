@@ -5,11 +5,51 @@
 #   http://www.boost.org/LICENSE_1_0.txt)
 
 import xml.etree.ElementTree as ET
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook, load_workbook 
+from openpyxl.utils import get_column_letter
 import os
 import sys
 import argparse
 from datetime import date, datetime
+
+class Attributes:
+    def __init__(self, lst, num):
+        self.tag = lst[0]
+        self.heading = lst[1]
+        self.index = num
+        self.column = num + 1
+
+class JiraFields:
+    def __init__(self, listoflist):
+        self.field_list = []
+        count = 0
+        for el in listoflist:
+            self.field_list.append(Attributes(el, count))
+            count = count + 1
+    def __getitem__(self, key):
+        return self.field_list[key]
+    def __len__(self):
+        return len(self.field_list)
+    def find_column(self, str):
+        for el in self.field_list:
+            if str == el.tag:
+                return get_column_letter(el.column)
+        raise NameError("No such tag found!")
+    def find_column_num(self, str):
+        for el in self.field_list:
+            if str == el.tag:
+                return el.column
+        raise NameError("No such tag found!")
+    def find_index(self, str):
+        for el in self.field_list:
+            if str == el.tag:
+                return el.index
+        raise NameError("No such tag found!")
+    def headings(self):
+        tmp = []
+        for el in self.field_list:
+            tmp.append(el.heading)
+        return tmp
 
 def read_xml(file):
     # Read in xml file
@@ -20,15 +60,15 @@ def read_xml(file):
     #print(root.tag)
     return root
 
-def read_excel(file):
+def read_excel(file, jira_fields):
     # Set up Excel
     if os.path.exists(file):
         wb = load_workbook(filename = file)
     else:
        wb = Workbook()
        ws = wb.active
-       # Add Heading
-       ws.append(headings)
+       # Add Headings
+       ws.append(jira_fields.headings())
     return wb
 
 def find_keys (root):
@@ -160,94 +200,104 @@ print("Writing to ", excel_file)
 # URL Root for Jira tickets
 jira_url_root = 'http://ontrack-internal.amd.com/browse/'
 
-# List the tags you are interested in collcecting
-dict_keys = ["type", "key" , "summary", "assignee"
-                         , "reporter", "status", "created", "updated"
-                         , "priority", "triage", "labels" 
-                         , "blocks", "blocked_by"]
-                         #, "Target SW Release"]
+# List the tags you are interested in collcecting and provide a heading
+field_list = [["type", "Issue Type"]
+             , ["key", "Key"]
+             , ["summary", "Summary"]
+             , ["assignee", "Assignee"]          
+             , ["reporter", "Reporter"]
+             , ["status", "Status"]
+             , ["created", "Created"]
+             , ["updated", "Updated"]
+             , ["priority", "Priority"]
+             , ["triage", "Triage Assignment"]
+             , ["labels", "Lablels"]
+             , ["blocks", "Blocks"]
+             , ["blocked_by", "Blocked By"]]
+            #, ["Target SW Release", "Target SW Release"]]
 
-# List the heading you would like to use
-headings = ["Issue Type", "Key", "Summary", "Assignee"
-                         , "Reporter", "Status", "Created", "Updated"
-                         , "Priority", "Triage Assignment", "Lablels"
-                         , "Blocks", "Blocked By"]
-                         #, "Target SW Release"]
+jira_fields = JiraFields(field_list)
 
 xml_root = read_xml(xml_file)
-wb = read_excel(excel_file)
+wb = read_excel(excel_file, jira_fields)
 ws = wb.active
 
-column_b = ws['B'] # Need to update to find the colummn based on heading
-column_h = ws['H']
+key_column = ws[jira_fields.find_column("key")]
+updated_column = ws[jira_fields.find_column("updated")]
 excel_data = []
 excel_keys = []
-for el in range(1,len(column_b)):
+for el in range(1,len(key_column)):
     temp = []
     temp.append(el)
-    temp.append(column_b[el].value)
-    excel_keys.append(column_b[el].value)
-    temp.append(column_h[el].value)
+    temp.append(key_column[el].value)
+    excel_keys.append(key_column[el].value)
+    temp.append(updated_column[el].value)
     excel_data.append(temp)
 
 # Find all unique tickets in XML
-keys = find_keys(xml_root)
+xml_keys = find_keys(xml_root)
 # print(keys)
 
-# Create a list of tickets and thier tags
-tickets = []
-for el in keys:
+# Create a list of tickets and thier tags from the XML
+xml_tickets = []
+for el in xml_keys:
     temp = []
-    for el2 in dict_keys:
-        temp.append(find_tag(el, el2))
-    tickets.append(temp)
+    for el2 in jira_fields:
+        temp.append(find_tag(el, el2.tag))
+    xml_tickets.append(temp)
 
 # Write to Excel
 ## Search for copies
 new_tickets = 0
 updated_tickets = 0
 
-for el in range(len(keys)):
+# Index of the "updated" element
+up_index = jira_fields.find_index("updated")
+
+for el in range(len(xml_keys)):
     try:
         # Try to find each key in the excel keys.
         # Will throw an exception if it cannot find a match
        
         ## Return the index of the key
-        result = excel_keys.index(keys[el])
+        result = excel_keys.index(xml_keys[el])
         ## Determine if all values should updated vased on "Updated" value
-        ### Compare Updated value (Column H)
-        if tickets[el][7] != excel_data[result][2].strftime("%m/%d/%Y %H:%M:%S") or args.force_update:   #Need to enumerate headings
+        ### Compare Updated value
+        if xml_tickets[el][up_index] != excel_data[result][2].strftime("%m/%d/%Y %H:%M:%S") or args.force_update:
             updated_tickets += 1
-            ## Update ticket with current infromation
-            for el2 in range(len(dict_keys)):
+            ## Update ticket with current information
+            for el2 in range(len(jira_fields)):
                 c = el2 + 1 # Columns start with 1
                 r = result + 2 #Rows start with 1, add offset for heading
-                ws.cell(row=r, column=c).value = tickets[el][el2]
+                ws.cell(row=r, column=c).value = xml_tickets[el][el2]
     except ValueError:
         ## The keys was not found append the new ticket
         new_tickets += 1
-        add_issue(tickets[el])
+        add_issue(xml_tickets[el])
 
 print("Updated Tickets: ", updated_tickets)
 print("New Tickets", new_tickets)
 
 # Add URLs to keys
 #  For the "Key" Column
-for cell in ws.iter_rows(min_row=2, min_col=2, max_col=2):
+key_col = jira_fields.find_column_num("key")
+for cell in ws.iter_rows(min_row=2, min_col=key_col, max_col=key_col):
     if cell[0].style is not "Hyperlink":
         iname = cell[0].value
         ws[cell[0].coordinate].hyperlink = jira_url_root + iname
         ws[cell[0].coordinate].style = "Hyperlink"
 
 # Add Date format for created column
-for cell in ws.iter_rows(min_row=2, min_col=7, max_col=7):
+crt_col = jira_fields.find_column_num("created")
+for cell in ws.iter_rows(min_row=2, min_col=crt_col, max_col=crt_col):
     if not cell[0].is_date:
         date_obj = datetime.strptime(cell[0].value, '%m/%d/%Y %H:%M:%S')
         ws[cell[0].coordinate].value = date_obj
         ws[cell[0].coordinate].number_format = 'MMM DD, YYYY'
 
 # Add Date format for updated column
-for cell in ws.iter_rows(min_row=2, min_col=8, max_col=8):
+up_col = jira_fields.find_column_num("updated")
+for cell in ws.iter_rows(min_row=2, min_col=up_col, max_col=up_col):
     if not cell[0].is_date:
         date_obj = datetime.strptime(cell[0].value, '%m/%d/%Y %H:%M:%S')
         ws[cell[0].coordinate].value = date_obj
