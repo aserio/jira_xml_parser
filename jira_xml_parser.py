@@ -7,6 +7,7 @@
 import xml.etree.ElementTree as ET
 from openpyxl import Workbook, load_workbook 
 from openpyxl.utils import get_column_letter
+from openpyxl.comments import Comment
 import os
 import sys
 import argparse
@@ -303,4 +304,12 @@ for cell in ws.iter_rows(min_row=2, min_col=up_col, max_col=up_col):
         ws[cell[0].coordinate].value = date_obj
         ws[cell[0].coordinate].number_format = 'MMM DD, YYYY'
 
+# Note the current time as a comment on cell A1
+## Need to get the current date from the xml file!!!
+now = datetime.now()
+comment_str = "Last Updated: " + now.strftime('%m/%d/%Y %H:%M:%S')
+comment = Comment(comment_str, "jira_xml_parser")
+ws["A1"].comment = comment
+
 wb.save(excel_file)
+wb.close()
