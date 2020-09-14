@@ -14,6 +14,7 @@ import argparse
 from datetime import date, datetime
 
 class Attributes:
+    # Excel Jira feild meta-data
     def __init__(self, lst, num):
         self.tag = lst[0]
         self.heading = lst[1]
@@ -21,6 +22,7 @@ class Attributes:
         self.column = num + 1
 
 class JiraFields:
+    # Object which holds all of the Excel Jira Feilds and thier meta-data
     def __init__(self, listoflist):
         self.field_list = []
         count = 0
