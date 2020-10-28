@@ -71,7 +71,7 @@ def read_excel(file, jira_fields):
         # Get current Excel column headings
         jira_headings = jira_fields.headings()
         excel_headings = ws[1]
-        # Check for overlapping headings
+        # Ensure headings are the same
         for i in range(len(jira_headings)):
             if jira_headings[i] != excel_headings[i].value:
                 print_str = "Error: Trying to map '" + jira_headings[i] + "' to '" + excel_headings[i].value + "'"
@@ -189,7 +189,6 @@ def find_tsr(key):
     if ET.iselement(xml_root.find(text)):
         xelement = xml_root.find(text)
         return clean_string(xelement.text)
- #       print(clean_string(xelement.text))
     else:
         return ""
 
