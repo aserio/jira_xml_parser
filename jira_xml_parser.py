@@ -22,7 +22,7 @@ class Attributes:
         self.column = num + 1
 
 class JiraFields:
-    # Object which holds all of the Excel Jira Feilds and thier meta-data
+    # Object which holds all of the Excel Jira Feilds and their meta-data
     def __init__(self, listoflist):
         self.field_list = []
         count = 0
@@ -67,6 +67,15 @@ def read_excel(file, jira_fields):
     # Set up Excel
     if os.path.exists(file):
         wb = load_workbook(filename = file)
+        ws = wb.active
+        # Get current Excel column headings
+        jira_headings = jira_fields.headings()
+        excel_headings = ws[1]
+        # Check for overlapping headings
+        for i in range(len(jira_headings)):
+            if jira_headings[i] != excel_headings[i].value:
+                print_str = "Error: Trying to map '" + jira_headings[i] + "' to '" + excel_headings[i].value + "'"
+                sys.exit(print_str)
     else:
        wb = Workbook()
        ws = wb.active
@@ -98,6 +107,8 @@ def find_tag (key, tag):
         tag_tablet = find_blocks(key)
     elif tag is 'blocked_by':
         tag_tablet = find_blocked_by(key)
+    elif tag is 'tsr':
+        tag_tablet = find_tsr(key)
     else:
         text = "./channel/item/[key='"+key+"']"
         tag_tablet = xml_root.find(text).find(tag).text
@@ -173,6 +184,15 @@ def find_blocked_by(key):
     else:
         return ""
 
+def find_tsr(key):
+    text = "./channel/item/customfields/..[key='"+key+"']/customfields/customfield[@id='customfield_15484']/customfieldvalues/"
+    if ET.iselement(xml_root.find(text)):
+        xelement = xml_root.find(text)
+        return clean_string(xelement.text)
+ #       print(clean_string(xelement.text))
+    else:
+        return ""
+
 def clean_string(str):
     # Remove returns and excess whitespace.
     str = str.replace('\n',"").replace("  ", "")
@@ -212,12 +232,12 @@ field_list = [["type", "Issue Type"]
              , ["status", "Status"]
              , ["created", "Created"]
              , ["updated", "Updated"]
+             , ["tsr", "Target SW Release"]
              , ["priority", "Priority"]
              , ["triage", "Triage Assignment"]
              , ["labels", "Lablels"]
              , ["blocks", "Blocks"]
              , ["blocked_by", "Blocked By"]]
-            #, ["Target SW Release", "Target SW Release"]]
 
 jira_fields = JiraFields(field_list)
 
