@@ -110,8 +110,12 @@ def find_tag (key, tag):
     elif tag is 'tsr':
         tag_tablet = find_tsr(key)
     else:
-        text = "./channel/item/[key='"+key+"']"
-        tag_tablet = xml_root.find(text).find(tag).text
+        # Work around as METACA tickets do not have an assignee
+        if key[:6] == 'METACA' and tag == 'assignee':
+            pass
+        else:
+            text = "./channel/item/[key='"+key+"']"
+            tag_tablet = xml_root.find(text).find(tag).text
     return tag_tablet
 
 def find_labels(key):
@@ -260,7 +264,7 @@ for el in range(1,len(key_column)):
 xml_keys = find_keys(xml_root)
 # print(keys)
 
-# Create a list of tickets and thier tags from the XML
+# Create a list of tickets and their tags from the XML
 xml_tickets = []
 for el in xml_keys:
     temp = []
